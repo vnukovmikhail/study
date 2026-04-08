@@ -4,68 +4,48 @@ import (
 	"fmt"
 )
 
-var (
-	a = 1
-)
-
 func main() {
-	type student struct {
-		firstName string
-		lastName  string
-		age       int
-		subject   []string
+	day := "Tuef"
+
+	switch day {
+	case "Mon":
+		fmt.Println("Its monday")
+	case "Tue":
+		fmt.Println("Oh my ga")
+	default:
+		fmt.Println("Idonow")
 	}
 
-	var student1 student
-	student1 = student{"code", "golang", 17, []string{"maths", "science"}}
-	fmt.Printf("%+v\n", student1)
-
-	student2 := student{
-		firstName: "foo",
-		lastName:  "bar",
-		age:       19,
+	switch wordLen := len(day); wordLen {
+	case 4:
+		fallthrough
+	case 1:
+		fmt.Println(1)
+	case 2:
+		fmt.Println(22)
+	case 3:
+		fmt.Println(333)
 	}
-
-	fmt.Println("First name of student2:", student2.firstName)
-
-	student2.subject = append(student2.subject, "arts")
-	fmt.Printf("%+v\n", student2)
-
-	guardian := struct {
-		firstName string
-		lastName  string
-	}{
-		firstName: "Alex",
-		lastName:  "Theo",
-	}
-	fmt.Printf("%+v\n", guardian)
-
-	fmt.Println(a)
-	{
-		a := 12
-		fmt.Println(a)
-	}
-	fmt.Println(a)
-	a := "f"
-	for index, r_value := range a {
-		fmt.Printf("idx:%d, val:%c\n", index, r_value)
-	}
-
-	ages := map[string]int{
-		"Alice": 30,
-		"Bob":   15,
-	}
-
-	for name, age := range ages {
-		fmt.Printf("%s is %d y.o.\n", name, age)
-	}
-
-	b := 100
-	for {
-		fmt.Println(b)
-		b--
-		if b == 90 {
-			break
+	/* for i := 0; i < 5; i++ {
+		if i == 2 {
+			continue
 		}
-	}
+		fmt.Println(i)
+	} */
+	/* outerLoop:
+	   	for i := 0; i < 3; i++ {
+	   		for j := 0; j < 3; j++ {
+	   			if i == 1 && j == 1 {
+	   				continue outerLoop
+	   			}
+	   			fmt.Println(i, j)
+	   			if i == 2 && j == 2 {
+	   				goto end
+	   			}
+	   			fmt.Println("watafa")
+	   		}
+	   	}
+
+	   end:
+	   	fmt.Println("The end of the program") */
 }
