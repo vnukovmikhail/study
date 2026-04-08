@@ -1,31 +1,26 @@
 package main
 
-import "fmt"
-
-func counter() func() int {
-	count := 0
-	return func() int {
-		count++
-		return count
-	}
-}
+import (
+	"fmt"
+)
 
 func main() {
-	increment := counter()
-	fmt.Println(increment())
-	fmt.Println(increment())
+	message := "Hello, "
 
-	numbers := []int{1, 2, 3, 4, 5}
-	squared := sliceOperation(numbers, func(i int) int {
-		return i * i
-	})
-	fmt.Println(squared)
-}
-
-func sliceOperation(s []int, op func(int) int) []int {
-	result := make([]int, len(s))
-	for i, v := range s {
-		result[i] = op(v)
+	greetingFn := func(name string) {
+		fmt.Println(message + name)
 	}
-	return result
+
+	defer greetingFn("Alice")
+	defer greetingFn("Bob")
+
+	// os.Exit(1)
+
+	defer func(name string) {
+		fmt.Println(message + name)
+	}("Lesh")
+
+	fmt.Println("Test")
+
+	message = "Hi, "
 }
