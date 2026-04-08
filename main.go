@@ -1,26 +1,13 @@
 package main
 
-import (
-	"fmt"
-)
+import "fmt"
 
 func main() {
-	message := "Hello, "
+	var intPtr *int
+	fmt.Println(intPtr)
 
-	greetingFn := func(name string) {
-		fmt.Println(message + name)
-	}
-
-	defer greetingFn("Alice")
-	defer greetingFn("Bob")
-
-	// os.Exit(1)
-
-	defer func(name string) {
-		fmt.Println(message + name)
-	}("Lesh")
-
-	fmt.Println("Test")
-
-	message = "Hi, "
+	age := 10
+	intPtr = &age
+	fmt.Println(intPtr)
+	fmt.Println(*intPtr)
 }
