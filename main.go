@@ -4,6 +4,10 @@ import (
 	"fmt"
 )
 
+var (
+	a = 1
+)
+
 func main() {
 	type student struct {
 		firstName string
@@ -35,4 +39,33 @@ func main() {
 		lastName:  "Theo",
 	}
 	fmt.Printf("%+v\n", guardian)
+
+	fmt.Println(a)
+	{
+		a := 12
+		fmt.Println(a)
+	}
+	fmt.Println(a)
+	a := "f"
+	for index, r_value := range a {
+		fmt.Printf("idx:%d, val:%c\n", index, r_value)
+	}
+
+	ages := map[string]int{
+		"Alice": 30,
+		"Bob":   15,
+	}
+
+	for name, age := range ages {
+		fmt.Printf("%s is %d y.o.\n", name, age)
+	}
+
+	b := 100
+	for {
+		fmt.Println(b)
+		b--
+		if b == 90 {
+			break
+		}
+	}
 }
