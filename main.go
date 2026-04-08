@@ -2,21 +2,13 @@ package main
 
 import "fmt"
 
-func double(x int) int {
-	return x * 2
-}
+type multiplier func(int) int
 
-func triple(x int) int {
-	return x * 3
-}
+type operation func(int, int) int
 
-func apply(f func(int) int, x int) int {
-	return f(x)
-}
-
-func multiplyBy(multiplier int) func(int) int {
+func multiplyBy(m int) multiplier {
 	return func(i int) int {
-		return i * multiplier
+		return i * m
 	}
 }
 
@@ -25,47 +17,24 @@ func main() {
 	multiplyByThree := multiplyBy(3)
 	fmt.Println(multiplyByTwo(7), multiplyByThree(9))
 
-	sayHi()
-	fn := fullname("Mr.", "Bug")
-	sayHiToSomeone(fn)
+	var perform operation
+	perform = arithmeticOperation("add")
+	fmt.Println(perform(5, 7))
+}
 
-	_, l := fullnameWithLength("Mr.", "Bug")
-	fmt.Println(fn, l)
-
-	s := sum(1, 2, 3, 4, 5)
-	fmt.Println(s)
-
-	nums := []int{1, 2, 3, 4, 5, 6}
-	fmt.Println(sum(nums...))
-
-	fiveTime := func(x int) int {
-		return x * 5
+func arithmeticOperation(op string) func(int, int) int {
+	switch op {
+	case "add":
+		return func(i1, i2 int) int {
+			return i1 + i2
+		}
+	case "subtract":
+		return func(i1, i2 int) int {
+			return i1 - i2
+		}
+	default:
+		return func(i1, i2 int) int {
+			return i1 + i2
+		}
 	}
-	result := apply(fiveTime, 5)
-	fmt.Println(result)
-}
-
-func sum(nums ...int) int {
-	total := 0
-	for _, num := range nums {
-		total += num
-	}
-	return total
-}
-
-func fullnameWithLength(firstName string, lastName string) (string, int) {
-	fn := fmt.Sprintf("%s %s", firstName, lastName)
-	return fn, len(fn)
-}
-
-func sayHi() {
-	fmt.Println("Hi!")
-}
-
-func sayHiToSomeone(name string) {
-	fmt.Println("Hi!", name)
-}
-
-func fullname(firstName string, lastName string) string {
-	return fmt.Sprintf("%s %s", firstName, lastName)
 }
