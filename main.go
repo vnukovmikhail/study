@@ -1,48 +1,35 @@
 package main
 
 import (
-	"errors"
 	"fmt"
+	"log"
+	"log/slog"
+	"net/http"
 )
 
-type student struct {
-	firstName string
-	lastName  string
-}
-
 func main() {
-	a := 10
-	increment(&a)
-	fmt.Println(a)
+	mux := http.NewServeMux()
 
-	s := student{
-		firstName: "code",
-		lastName:  "learn",
-	}
+	mux.HandleFunc("/", handleHello)
+	mux.HandleFunc("/goodbye", handleGoodbye)
 
-	previousLastName, err := updateLastName(&s, "")
+	log.Fatal(http.ListenAndServe(":8080", mux))
+}
+
+func handleHello(w http.ResponseWriter, _ *http.Request) {
+	wc, err := w.Write([]byte("Hi!\n"))
 	if err != nil {
-		fmt.Println(err)
+		slog.Error("error writing response", "err", err)
+		return
 	}
-	fmt.Println(previousLastName)
-	// fmt.Println(s)
-
-	prettyPrintStudent(&s)
+	fmt.Printf("%b bytes written\n", wc)
 }
 
-func prettyPrintStudent(s *student) {
-	fmt.Printf("F-%s-%s\n", s.firstName, s.lastName)
-}
-
-func updateLastName(s *student, newLastName string) (*string, error) {
-	if newLastName == "" {
-		return nil, errors.New("Empty last name")
+func handleGoodbye(w http.ResponseWriter, _ *http.Request) {
+	wc, err := w.Write([]byte("Goodbye!\n"))
+	if err != nil {
+		slog.Error("error writing response", "err", err)
+		return
 	}
-	previous := s.lastName
-	s.lastName = newLastName
-	return &previous, nil
-}
-
-func increment(x *int) {
-	*x++
+	fmt.Printf("%b bytes written\n", wc)
 }
