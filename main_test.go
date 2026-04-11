@@ -1,9 +1,13 @@
 package main
 
 import (
+	"HTTPServer/internal/users"
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/mail"
+	"reflect"
 	"testing"
 )
 
@@ -119,5 +123,183 @@ func TestHandleUserResponsesHello(t *testing.T) {
 }
 
 func TestHandleHelloHeader(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/user/hello", nil)
+	req.Header.Set("user", "Test Man")
 
+	w := httptest.NewRecorder()
+
+	handleHelloHeader(w, req)
+
+	desiredCode := http.StatusOK
+	if w.Code != desiredCode {
+		t.Errorf("bad response code, expected: %v but got: %v\nbody: %s\n",
+			desiredCode, w.Code, w.Body.String())
+	}
+
+	expectedMessage := []byte("Hello, Test Man!\n")
+	if !bytes.Equal(expectedMessage, w.Body.Bytes()) {
+		t.Errorf("bad return, got: %q, expected: %q", w.Body.String(), expectedMessage)
+	}
+}
+
+func TestHandleHelloHeaderNoHeader(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/user/hello", nil)
+
+	w := httptest.NewRecorder()
+
+	handleHelloHeader(w, req)
+
+	desiredCode := http.StatusBadRequest
+	if w.Code != desiredCode {
+		t.Errorf("bad response code, expected: %v but got: %v\nbody: %s\n",
+			desiredCode, w.Code, w.Body.String())
+	}
+
+	expectedMessage := []byte("invalid username provided\n")
+	if !bytes.Equal(expectedMessage, w.Body.Bytes()) {
+		t.Errorf("bad return, got: %q, expected: %q", w.Body.String(), expectedMessage)
+	}
+}
+
+func TestHandleJSON(t *testing.T) {
+	testRequest := UserData{
+		FirstName: "Test Man",
+	}
+
+	marshalledRequestBody, err := json.Marshal(testRequest)
+	if err != nil {
+		t.Fatalf("error marshalling test data: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/json", bytes.NewBuffer(marshalledRequestBody))
+
+	w := httptest.NewRecorder()
+
+	handleJSON(w, req)
+
+	desiredCode := http.StatusOK
+	if w.Code != desiredCode {
+		t.Errorf("bad response code, expected: %v but got: %v\nbody: %s\n",
+			desiredCode, w.Code, w.Body.String())
+	}
+
+	expectedMessage := []byte("Hello, Test Man!\n")
+	if !bytes.Equal(expectedMessage, w.Body.Bytes()) {
+		t.Errorf("bad return, got: %q, expected: %q", w.Body.String(), expectedMessage)
+	}
+}
+
+func TestHandleJSONEmptyBody(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/json", nil)
+
+	w := httptest.NewRecorder()
+
+	handleJSON(w, req)
+
+	desiredCode := http.StatusBadRequest
+	if w.Code != desiredCode {
+		t.Errorf("bad response code, expected: %v but got: %v\nbody: %s\n",
+			desiredCode, w.Code, w.Body.String())
+	}
+
+	expectedMessage := []byte("bad request body\n")
+	if !bytes.Equal(expectedMessage, w.Body.Bytes()) {
+		t.Errorf("bad return, got: %q, expected: %q", w.Body.String(), expectedMessage)
+	}
+}
+
+func TestHandleJSONEmptyNameField(t *testing.T) {
+	testRequest := UserData{
+		FirstName: "",
+	}
+
+	marshalledRequestBody, err := json.Marshal(testRequest)
+	if err != nil {
+		t.Fatalf("error marshalling test data: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/json", bytes.NewBuffer(marshalledRequestBody))
+
+	w := httptest.NewRecorder()
+
+	handleJSON(w, req)
+
+	desiredCode := http.StatusBadRequest
+	if w.Code != desiredCode {
+		t.Errorf("bad response code, expected: %v but got: %v\nbody: %s\n",
+			desiredCode, w.Code, w.Body.String())
+	}
+
+	expectedMessage := []byte("invalid username provided\n")
+	if !bytes.Equal(expectedMessage, w.Body.Bytes()) {
+		t.Errorf("bad return, got: %q, expected: %q", w.Body.String(), expectedMessage)
+	}
+}
+
+func TestAddUser(t *testing.T) {
+	testUser := UserData{
+		FirstName: "Test",
+		LastName:  "Man",
+		Email:     "TestMan@example.com",
+	}
+
+	marshalledRequestBody, err := json.Marshal(testUser)
+	if err != nil {
+		t.Fatalf("error marshalling test data: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/user", bytes.NewBuffer(marshalledRequestBody))
+
+	w := httptest.NewRecorder()
+
+	testManager := users.NewManager()
+	testServer := server{
+		userManager: testManager,
+	}
+
+	testServer.addUser(w, req)
+
+	desiredCode := http.StatusOK
+	if w.Code != desiredCode {
+		t.Errorf("bad response code, expected: %v but got: %v\nbody: %s\n",
+			desiredCode, w.Code, w.Body.String())
+	}
+
+	resultUser, err := testManager.GetUserByName(testUser.FirstName, testUser.LastName)
+	if err != nil {
+		t.Fatalf("error getting test user back out of manager: %v", err)
+	}
+
+	convertedResult := convertUserToUserData(resultUser)
+
+	if !reflect.DeepEqual(&testUser, convertedResult) {
+		t.Errorf("bad retrieved user\nwanted")
+	}
+}
+
+func TestConvertUserToUserData(t *testing.T) {
+	testFirstName := "Test"
+	testLastName := "User"
+	testEmail, err := mail.ParseAddress("testuser@example.com")
+	if err != nil {
+		t.Fatalf("error parsing test email: %v", err)
+	}
+
+	testUser := users.User{
+		FirstName: testFirstName,
+		LastName:  testLastName,
+		Email:     *testEmail,
+	}
+
+	result := convertUserToUserData(&testUser)
+
+	expectedUser := &UserData{
+		FirstName: testFirstName,
+		LastName:  testLastName,
+		Email:     testEmail.Address,
+	}
+
+	if !reflect.DeepEqual(expectedUser, result) {
+		t.Errorf("bad conversion\nwant: %+v\ngot: %+v\n", expectedUser, result)
+	}
 }

@@ -1,13 +1,31 @@
 package main
 
 import (
+	"HTTPServer/internal/users"
 	"bytes"
+	"encoding/json"
+	"io"
 	"log"
 	"log/slog"
 	"net/http"
 )
 
+type UserData struct {
+	FirstName string
+	LastName  string
+	Email     string
+}
+
+type server struct {
+	userManager *users.Manager
+}
+
 func main() {
+	manager := users.NewManager()
+	s := server{
+		userManager: manager,
+	}
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/{$}", handleRoot)
@@ -15,8 +33,26 @@ func main() {
 	mux.HandleFunc("/hello/", handleHelloParameterized)
 	mux.HandleFunc("/responses/{user}/hello/", handleUserResponsesHello)
 	mux.HandleFunc("/user/hello", handleHelloHeader)
+	mux.HandleFunc("POST /json/", handleJSON)
+	mux.HandleFunc("POST /add-user", s.addUser)
 
 	log.Fatal(http.ListenAndServe(":8080", mux))
+}
+
+func (s *server) addUser(w http.ResponseWriter, r *http.Request) {
+	requestBody := http.MaxBytesReader(w, r.Body, 1048576)
+
+	decoder := json.NewDecoder(requestBody)
+	decoder.DisallowUnknownFields()
+
+	var u UserData
+
+	err := decoder.Decode(&u)
+	if err != nil {
+		slog.Error("error decoding addUsers request body", "err", err)
+		http.Error(w, "bad request body", http.StatusBadRequest)
+		return
+	}
 }
 
 func handleRoot(w http.ResponseWriter, _ *http.Request) {
@@ -44,21 +80,50 @@ func handleHelloParameterized(w http.ResponseWriter, r *http.Request) {
 		username = userList[0]
 	}
 
-	var output bytes.Buffer
-	output.WriteString("Hello, ")
-	output.WriteString(username)
-	output.WriteString("!\n")
-
-	_, err := w.Write(output.Bytes())
-	if err != nil {
-		slog.Error("error writing response", "err", err)
-		return
-	}
+	handleHello(w, username)
 }
 
 func handleUserResponsesHello(w http.ResponseWriter, r *http.Request) {
 	username := r.PathValue("user")
 
+	handleHello(w, username)
+}
+
+func handleHelloHeader(w http.ResponseWriter, r *http.Request) {
+	username := r.Header.Get("user")
+	if username == "" {
+		http.Error(w, "invalid username provided", http.StatusBadRequest)
+		return
+	}
+
+	handleHello(w, username)
+}
+
+func handleJSON(w http.ResponseWriter, r *http.Request) {
+	byteData, err := io.ReadAll(r.Body)
+	if err != nil || len(byteData) < 1 {
+		slog.Error("error reading request body", "err", err)
+		http.Error(w, "bad request body", http.StatusBadRequest)
+		return
+	}
+
+	var reqData UserData
+	err = json.Unmarshal(byteData, &reqData)
+	if err != nil {
+		slog.Error("error unmarshalling request body", "err", err)
+		http.Error(w, "error parsing request JSON", http.StatusBadRequest)
+		return
+	}
+
+	if reqData.FirstName == "" {
+		http.Error(w, "invalid username provided", http.StatusBadRequest)
+		return
+	}
+
+	handleHello(w, reqData.FirstName)
+}
+
+func handleHello(w http.ResponseWriter, username string) {
 	var output bytes.Buffer
 	output.WriteString("Hello, ")
 	output.WriteString(username)
@@ -71,6 +136,12 @@ func handleUserResponsesHello(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleHelloHeader(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "not implemented", http.StatusInternalServerError)
+func convertUserToUserData(u *users.User) *UserData {
+	converted := UserData{
+		FirstName: u.FirstName,
+		LastName:  u.LastName,
+		Email:     u.Email.Address,
+	}
+
+	return &converted
 }
