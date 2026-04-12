@@ -124,11 +124,22 @@ func TestHandleUserResponsesHello(t *testing.T) {
 
 func TestHandleHelloHeader(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/user/hello", nil)
-	req.Header.Set("user", "Test Man")
+	req.Header.Set("userFirst", "Test")
+	req.Header.Set("userLast", "Man")
 
 	w := httptest.NewRecorder()
 
-	handleHelloHeader(w, req)
+	testManager := users.NewManager()
+	err := testManager.AddUser("Test", "Man", "testman@example.com")
+	if err != nil {
+		t.Fatalf("error creating test user: %v", err)
+	}
+
+	testServer := server{
+		userManager: testManager,
+	}
+
+	testServer.handleHelloHeader(w, req)
 
 	desiredCode := http.StatusOK
 	if w.Code != desiredCode {
@@ -136,7 +147,7 @@ func TestHandleHelloHeader(t *testing.T) {
 			desiredCode, w.Code, w.Body.String())
 	}
 
-	expectedMessage := []byte("Hello, Test Man!\n")
+	expectedMessage := []byte("Hello, Test Man! Your email is: testman@example.com\n")
 	if !bytes.Equal(expectedMessage, w.Body.Bytes()) {
 		t.Errorf("bad return, got: %q, expected: %q", w.Body.String(), expectedMessage)
 	}
@@ -147,7 +158,9 @@ func TestHandleHelloHeaderNoHeader(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	handleHelloHeader(w, req)
+	testServer := server{}
+
+	testServer.handleHelloHeader(w, req)
 
 	desiredCode := http.StatusBadRequest
 	if w.Code != desiredCode {
@@ -155,7 +168,7 @@ func TestHandleHelloHeaderNoHeader(t *testing.T) {
 			desiredCode, w.Code, w.Body.String())
 	}
 
-	expectedMessage := []byte("invalid username provided\n")
+	expectedMessage := []byte("invalid first name provided\n")
 	if !bytes.Equal(expectedMessage, w.Body.Bytes()) {
 		t.Errorf("bad return, got: %q, expected: %q", w.Body.String(), expectedMessage)
 	}
@@ -249,6 +262,7 @@ func TestAddUser(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/user", bytes.NewBuffer(marshalledRequestBody))
+	req.Header.Set("Content-Type", "application/json")
 
 	w := httptest.NewRecorder()
 
@@ -274,6 +288,154 @@ func TestAddUser(t *testing.T) {
 
 	if !reflect.DeepEqual(&testUser, convertedResult) {
 		t.Errorf("bad retrieved user\nwanted")
+	}
+}
+
+func TestAddUserBadHeader(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/add-user", nil)
+
+	w := httptest.NewRecorder()
+
+	testManager := users.NewManager()
+	testServer := server{
+		userManager: testManager,
+	}
+
+	testServer.addUser(w, req)
+
+	desiredCode := http.StatusUnsupportedMediaType
+	if w.Code != desiredCode {
+		t.Errorf("bad response code, expected: %v but got: %v\nbody: %s\n", desiredCode, w.Code, w.Body.String())
+	}
+
+	expectedBody := []byte("unsupported Content-Type header: \"\"\n")
+	if !bytes.Equal(expectedBody, w.Body.Bytes()) {
+		t.Errorf("bad response body, should be: %q, but got: %q", expectedBody, w.Body.String())
+	}
+}
+
+func TestGetUser(t *testing.T) {
+	testFirstName := "Test"
+	testLastName := "Man"
+	testEmail := "TestMan@example.com"
+
+	testManager := users.NewManager()
+	testServer := server{
+		userManager: testManager,
+	}
+
+	err := testManager.AddUser(testFirstName, testLastName, testEmail)
+	if err != nil {
+		t.Fatalf("error inserting test user: %v", err)
+	}
+
+	testQuery := UserData{
+		FirstName: testFirstName,
+		LastName:  testLastName,
+	}
+
+	marshalledRequestBody, err := json.Marshal(testQuery)
+	if err != nil {
+		t.Fatalf("error marshalling test data: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/add-user", bytes.NewBuffer(marshalledRequestBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+
+	testServer.getUser(w, req)
+
+	desiredCode := http.StatusOK
+	if w.Code != desiredCode {
+		t.Errorf("bad response code, expected: %v, but got: %v\nbody: %s",
+			desiredCode, w.Code, w.Body.String())
+	}
+
+	decoder := json.NewDecoder(w.Body)
+	decoder.DisallowUnknownFields()
+
+	var decodedResult UserData
+	err = decoder.Decode(&decodedResult)
+	if err != nil {
+		t.Fatalf("error decoding response body: %v", err)
+	}
+
+	expectedData := UserData{
+		FirstName: testFirstName,
+		LastName:  testLastName,
+		Email:     testEmail,
+	}
+
+	if !reflect.DeepEqual(decodedResult, expectedData) {
+		t.Errorf("bad result\ngot: %+v\nwanted: %+v\n", decodedResult, expectedData)
+	}
+}
+
+func TestGetUserBadHeader(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/get-user", nil)
+
+	w := httptest.NewRecorder()
+
+	testManager := users.NewManager()
+	testServer := server{
+		userManager: testManager,
+	}
+
+	testServer.getUser(w, req)
+
+	desiredCode := http.StatusUnsupportedMediaType
+	if w.Code != desiredCode {
+		t.Errorf("bad response code, expected: %v but got: %v\nbody: %s\n", desiredCode, w.Code, w.Body.String())
+	}
+
+	expectedBody := []byte("unsupported Content-Type header: \"\"\n")
+	if !bytes.Equal(expectedBody, w.Body.Bytes()) {
+		t.Errorf("bad response body, should be: %q, but got: %q", expectedBody, w.Body.String())
+	}
+}
+
+func TestGetUserNoUser(t *testing.T) {
+	testFirstName := "Test"
+	testLastName := "Man"
+	testEmail := "TestMan@example.com"
+
+	testManager := users.NewManager()
+	testServer := server{
+		userManager: testManager,
+	}
+
+	err := testManager.AddUser(testFirstName, testLastName, testEmail)
+	if err != nil {
+		t.Fatalf("error inserting test user: %v", err)
+	}
+
+	testQuery := UserData{
+		FirstName: "foo",
+		LastName:  "bar",
+	}
+
+	marshalledRequestBody, err := json.Marshal(testQuery)
+	if err != nil {
+		t.Fatalf("error marshalling test data: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/add-user", bytes.NewBuffer(marshalledRequestBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+
+	testServer.getUser(w, req)
+
+	desiredCode := http.StatusNotFound
+	if w.Code != desiredCode {
+		t.Errorf("bad response code, expected: %v, but got: %v\nbody: %s",
+			desiredCode, w.Code, w.Body.String())
+	}
+
+	expectedBody := []byte("no users found\n")
+	if bytes.Equal(expectedBody, w.Body.Bytes()) {
+		t.Errorf("bad response body, should be %q, but got %q", expectedBody, w.Body.String())
 	}
 }
 
