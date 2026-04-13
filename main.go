@@ -3,13 +3,18 @@ package main
 import (
 	"HTTPServer/internal/users"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"net/http"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
 )
 
 type UserData struct {
@@ -24,11 +29,18 @@ type server struct {
 
 func main() {
 	manager := users.NewManager()
+	defer manager.Shutdown()
+
 	s := server{
 		userManager: manager,
 	}
 
 	mux := http.NewServeMux()
+
+	httpServer := &http.Server{
+		Addr:    ":8080",
+		Handler: mux,
+	}
 
 	mux.HandleFunc("/{$}", handleRoot)
 	mux.HandleFunc("/goodbye", handleGoodbye)
@@ -39,7 +51,37 @@ func main() {
 	mux.HandleFunc("POST /add-user", s.addUser)
 	mux.HandleFunc("POST /get-user", s.getUser)
 
-	log.Fatal(http.ListenAndServe(":8080", mux))
+	go func() {
+		slog.Info("starting server")
+		err := httpServer.ListenAndServe()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("HTTP server error", "err", err)
+			os.Exit(1)
+		}
+	}()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		sigChan := make(chan os.Signal)
+		signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+
+		<-sigChan
+		slog.Info("shutting down server")
+
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer shutdownCancel()
+
+		err := httpServer.Shutdown(shutdownCtx)
+		if err != nil {
+			slog.Error("error shutting down HTTP server", "err", err)
+		}
+	}()
+
+	wg.Wait()
+	slog.Info("server shutdown complete")
 }
 
 func (s *server) addUser(w http.ResponseWriter, r *http.Request) {
