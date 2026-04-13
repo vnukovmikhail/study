@@ -6,7 +6,7 @@ go run .
 ```
 Тесты
 ```go
-go test -v
+go test -v .
 ```
 Билд
 ```go
